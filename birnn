@@ -1,0 +1,32 @@
+
+def setmodel(max_features = 50000):
+
+
+    from keras.layers.convolutional_recurrent import ConvLSTM2D
+    from keras.layers.normalization import BatchNormalization
+
+    # (n_frames, width, height, channels) and returns 1/0
+
+    hidden_units = 16
+
+
+    model = Sequential()
+    model.add(Bidirectional(LSTM(hidden_units, return_sequences=True),
+                            input_shape=(MAXLEN, MAXF)))
+    model.add(Bidirectional(LSTM(hidden_units, return_sequences=True)) )
+    model.add(Bidirectional(LSTM(hidden_units)))
+
+    # Add second Bidirectional LSTM layer
+    #model.add(Flatten())
+    model.add(Dense(MAXF*MAXLEN))
+    model.add(Reshape((MAXLEN, MAXF)))
+
+    #seq.add(Conv3D(filters=1, kernel_size=(3, 3, 3),
+    #               activation='sigmoid',
+    #               padding='same', data_format='channels_last'))
+    model.compile(loss='mean_squared_error', optimizer='adadelta')
+
+    from keras.utils import plot_model
+    plot_model(model, to_file='DenoiseModel_BiRNN.png',show_shapes=True )
+
+    return model
