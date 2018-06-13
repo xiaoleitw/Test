@@ -1,17 +1,17 @@
 # 模板抽取流程文档
 
 # 1.	下载和处理Wikipedia数据 \
-a)	地址：https://dumps.wikimedia.org/backup-index.html
-b)	下载应为维基百科，如：https://dumps.wikimedia.org/enwiki/20180601/
-c)	下载网页数据（pages-articles）如: https://dumps.wikimedia.org/enwiki/20180601/enwiki-20180601-pages-articles.xml.bz2
-d)	把XML文档转换为无格式文本数据，使用wikiextractor工具（https://github.com/attardi/wikiextractor），如利用如下命令：bzip2 -dc enwiki-20180601-pages-articles.xml.bz2 | python WikiExtractor.py -l -b 10000m -o extracted
+a)	地址：https://dumps.wikimedia.org/backup-index.html \
+b)	下载应为维基百科，如：https://dumps.wikimedia.org/enwiki/20180601/ \
+c)	下载网页数据（pages-articles）如: https://dumps.wikimedia.org/enwiki/20180601/enwiki-20180601-pages-articles.xml.bz2\
+d)	把XML文档转换为无格式文本数据，使用wikiextractor工具（https://github.com/attardi/wikiextractor），如利用如下命令：bzip2 -dc enwiki-20180601-pages-articles.xml.bz2 | python WikiExtractor.py -l -b 10000m -o extracted\
 该步骤得到如下图的纯文本数据
  
-e)	把各个子文件合并成一个文件，如：cat wiki_00 wiki_01 > wiki_sent
+e)	把各个子文件合并成一个文件，如：cat wiki_00 wiki_01 > wiki_sent\
 
 # 2.	对Wikipedia文本进行实体链接
-a)	利用Wikifier工具：https://cogcomp.org/page/software_view/Wikifier
-b)	下载文件的目录（Wikifier2013）下，参考runSimpleTest.sh，运行命令： java -Xmx10G -jar dist/wikifier-3.0-jar-with-dependencies.jar -annotateData data/testSample/sampleText/test.txt data/testSample/sampleOutput/ false configs/STAND_ALONE_NO_INFERENCE.xml。“data/testSample/sampleText/test.txt”是输入的待链接文本文件，链接结果存储在“data/testSample/sampleOutput/”文件夹中
+a)	利用Wikifier工具：https://cogcomp.org/page/software_view/Wikifier\
+b)	下载文件的目录（Wikifier2013）下，参考runSimpleTest.sh，运行命令： java -Xmx10G -jar dist/wikifier-3.0-jar-with-dependencies.jar -annotateData data/testSample/sampleText/test.txt data/testSample/sampleOutput/ falseconfigs/STAND_ALONE_NO_INFERENCE.xml。“data/testSample/sampleText/test.txt”是输入的待链接文本文件，链接结果存储在“data/testSample/sampleOutput/”文件夹中
 该步骤得到的链接结果如下
 test.txt.NER.tagged——命名实体识别的结果；test.txt.wikification.tagged.flat.html——实体链接结果的html格式，通常解析此文件得到所需的实体链接结果；
 test.txt.wikification.tagged.full.xml：实体链接详细结果的xml文件
