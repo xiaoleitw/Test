@@ -1,6 +1,6 @@
-模板抽取流程文档
+# 模板抽取流程文档
 
-1.	下载和处理Wikipedia数据
+# 1.	下载和处理Wikipedia数据 \
 a)	地址：https://dumps.wikimedia.org/backup-index.html
 b)	下载应为维基百科，如：https://dumps.wikimedia.org/enwiki/20180601/
 c)	下载网页数据（pages-articles）如: https://dumps.wikimedia.org/enwiki/20180601/enwiki-20180601-pages-articles.xml.bz2
@@ -9,7 +9,7 @@ d)	把XML文档转换为无格式文本数据，使用wikiextractor工具（http
  
 e)	把各个子文件合并成一个文件，如：cat wiki_00 wiki_01 > wiki_sent
 
-2.	对Wikipedia文本进行实体链接
+# 2.	对Wikipedia文本进行实体链接
 a)	利用Wikifier工具：https://cogcomp.org/page/software_view/Wikifier
 b)	下载文件的目录（Wikifier2013）下，参考runSimpleTest.sh，运行命令： java -Xmx10G -jar dist/wikifier-3.0-jar-with-dependencies.jar -annotateData data/testSample/sampleText/test.txt data/testSample/sampleOutput/ false configs/STAND_ALONE_NO_INFERENCE.xml。“data/testSample/sampleText/test.txt”是输入的待链接文本文件，链接结果存储在“data/testSample/sampleOutput/”文件夹中
 该步骤得到的链接结果如下
@@ -22,14 +22,14 @@ data_dir = '/data/liuc/kb/wikipedia/enwiki-20160501/extracted/wikifier/FULL_UNAM
 out_path = '/data/hesz/wikipedia/wikifier/FULL_UNAMBIGUOUS/labeled_wiki_sentences' # 抽取文件存储结果
 extract_patterns_type1(data_dir, out_path) # 从wikifier结果中提取标记文本
 
-3.	对Wikipedia文本进行开放式关系抽取（open ie）
+# 3.	对Wikipedia文本进行开放式关系抽取（open ie）
 a)	利用华盛顿大学的Reverb工具：https://github.com/knowitall/reverb
 b)	下载Reverb工具，如利用下述命令：wget http://reverb.cs.washington.edu/reverb-latest.jar
 c)	对文本进行开放式信息抽取，如利用下述命令： java -Xmx512m -jar reverb-latest.jar wiki_sent > wiki_sent.reverb
 d)	抽取结果如下所示
  
 
-4.	下载Wikidata知识图谱数据
+# 4.	下载Wikidata知识图谱数据
 a)	数据描述网页：https://www.wikidata.org/wiki/Wikidata:Database_download
 b)	Json格式数据下载地址：https://dumps.wikimedia.org/wikidatawiki/entities/
 c)	下载wikidata数据，如使用如下命令：
@@ -44,7 +44,7 @@ extract_mid_name(data_dir) # 提取wikidata中的机器码（mid）对应的name
 extract_triple(data_dir) # 抽取wikidata中的三元组信息
 mid2name, mid2desp, mid2types, wiki2mid, ent_facts = extract_wikidata_info(data_dir, True)
 
-5.	抽取模板
+# 5.	抽取模板
 a)	标记了实体信息的文本数据：wikipedia/labeled_wiki_sentences
 b)	知识图谱数据目录：wikidata
 c)	开放式关系抽取数据：wiki_sent.reverb_np_triples
