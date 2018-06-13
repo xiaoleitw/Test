@@ -1,4 +1,4 @@
-# 已经有的公司
+## 已经有的公司
 医学影像：
 腾讯 - 觅影 https://miying.qq.com/official/ 
 汇医慧影 http://www.huiyihuiying.com/idoctor/html/newLoginVersion2/dist/html/index.html 
@@ -10,7 +10,7 @@ owkin： https://owkin.com/
 https://www.sciencedirect.com/science/article/pii/S1386505617300357 
 https://www.sciencedirect.com/science/article/pii/S0957417414000426 
 
-#　Survey：
+# Survey：
 A Survey on Deep Learning in Medical Image Analysis
  https://arxiv.org/pdf/1702.05747.pdf
 Medical Image Fusion: A survey of the state of the art
