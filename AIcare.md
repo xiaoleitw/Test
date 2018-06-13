@@ -1,8 +1,10 @@
 ## 已经有的公司
-医学影像：
+*医学影像：*
 腾讯 - 觅影 https://miying.qq.com/official/ 
+
 汇医慧影 http://www.huiyihuiying.com/idoctor/html/newLoginVersion2/dist/html/index.html 
-普通医疗：
+
+*普通医疗：*
 IBM Watson：https://www.ibm.com/watson/ 
 owkin： https://owkin.com/ 
 
