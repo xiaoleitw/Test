@@ -20,10 +20,12 @@ Medical Image Fusion: A survey of the state of the art
 Computational Health Informatics in the Big Data Age: A Survey
  https://www.cs.helsinki.fi/u/jilu/paper/HealthBigdata.pdf   
  
-# key points:
-(1) High-risk and high-cost patient management \
-(2) Risk-of-readmission prediction \ 
-(3) Mobile health for lifestyle recommendation \ 
+# key revenue:
+(1) High-risk and high-cost patient management  
+(2) Risk-of-readmission prediction  
+(3) Mobile health for lifestyle recommendation   
+
+
 
 
 
