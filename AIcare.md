@@ -1,4 +1,4 @@
-# 已经有的公司
+# 已经典型有的公司
 ## 医学影像：
 腾讯 - 觅影 https://miying.qq.com/official/   
 
