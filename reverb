@@ -1,0 +1,303 @@
+# encoding:utf-8
+
+import sys
+
+reload(sys)
+sys.setdefaultencoding('utf-8')
+
+import os
+import re
+import copy
+import random
+import codecs
+import gzip
+import urllib
+from collections import Counter
+
+# 提取知识库信息
+def extract_wikidata_info(kb_dir, need_fact=False):
+    mid2name, mid2desp, mid2types = dict(), dict(), dict() # 实体ID与名字对应表，实体ID与实体描述对应表，实体ID与类型对应情况
+    wiki2mid = dict() # 构建词典
+    if need_fact: # 是否需要存储三元组信息
+        ent_facts = dict() # 构建词典
+    with codecs.open(os.path.join(kb_dir, 'wiki_title_mids'), 'rb', 'utf-8') as wf:
+        for line in wf:
+            terms = line.split("\t") # 以\t分割
+            if len(terms) != 2: # 判断格式是否正确
+                continue
+            title, mid = [x.strip() for x in terms] # 提取内容
+            title = urllib.unquote(title).replace(' ', '_') # wikipedia中title中的空格是以'_'分割的
+            wiki2mid[title] = mid # 赋值
+        print "title: ", len(wiki2mid)
+    with codecs.open(os.path.join(kb_dir, 'mid_names_en'), 'rb', 'utf-8') as wf:
+        for line in wf:
+            terms = line.split("\t") # 以\t分割
+            if len(terms) != 2: # 判断格式是否正确
+                continue
+            terms = [x.strip() for x in terms] # 提取内容
+            mid = terms[0][3:] # 去除字符处前面wd:的部分
+            if mid not in mid2name:
+                mid2name[mid] = terms[1].replace('\t', ' ').replace(' ', '_') # 与wikipedia对应
+    with codecs.open(os.path.join(kb_dir, 'mid_description_en'), 'rb', 'utf-8') as wf:
+        for line in wf:
+            terms = line.split("\t") # 以\t分割
+            if len(terms) != 2: # 判断格式是否正确
+                continue
+            terms = [x.strip() for x in terms]
+            mid = terms[0][3:] # 去除字符处前面wd:的部分
+            if mid in mid2desp:
+                continue
+            desp = terms[1].strip()
+            mid2desp[mid] = desp.replace('\t', ' ').replace(' ', '_')
+    print "prop desp name: ", len(mid2desp)
+
+    # 提取实体三元组事实信息，以及实体类型信息
+    with codecs.open(os.path.join(kb_dir, 'triple'), 'rb', 'utf-8') as wf:
+        for line in wf:
+            terms = line.split("\t") # 以\t分割
+            if len(terms) != 3: # 判断格式是否正确
+                continue
+            sub, rel, obj = [w.strip() for w in terms][:3]
+            if rel.strip() == 'P31': # P31在wikdata是表示instance of的关系：https://www.wikidata.org/wiki/Property:P31
+                tmp_types = mid2types.get(sub, list()) # 提取类型
+                tmp_types.append(obj) # 添加类型
+                mid2types[sub] = tmp_types # 保存类型
+            if need_fact:
+                tmp_rels = ent_facts.get((sub, obj), set()) # 提取事实
+                tmp_rels.add(rel) # 添加事实
+                ent_facts[(sub, obj)] = tmp_rels # 保存事实
+    if need_fact:
+        print "entity pair num: ", len(ent_facts)
+        print "fact num: ", sum([len(x) for x in ent_facts.values()])
+    if need_fact:
+        return mid2name, mid2desp, mid2types, wiki2mid, ent_facts # 返回结果
+    else:
+        return mid2name, mid2desp, mid2types, wiki2mid, None  # 返回结果
+
+
+def filter_reverb_triple(pattern_dir, threshold=0.5):
+    print "threshold : ", threshold # 这是reverb抽取元组的阈值
+
+    writer = codecs.open(os.path.join(pattern_dir, 'wiki_sent.reverb_np_triples'), 'wb', 'utf-8')
+
+    def deal_one_sent(_sent, _phrase, _triple): # 处理一个句子的辅助函数
+        if len(_phrase) == 0 or len(_triple) == 0:
+            return
+        writer.write("%s\n" % _sent)
+        writer.write("%d\t%d\n" % (len(_phrase), len(_triple)))
+        phrase_strs = ['%d %d' % (s, e) for s, e in _phrase]
+        writer.write("%s\n" % '\t'.join(phrase_strs))
+        triple_sts = ["%s %f" % (' '.join(x), y) for x, y in _triple]
+        writer.write("%s\n" % '\t'.join(triple_sts))
+
+    sent_id, sent, phrases, triples = -1, '', list(), list()
+    line_num = 0
+    with codecs.open(os.path.join(pattern_dir, 'wiki_sent.reverb'), 'rb', 'utf-8') as rf:
+        for line in rf:
+            terms = line.split('\t')
+            line_num += 1
+            if (line_num % (100 * 1000)) == 0:
+                print "deal with: ", line_num
+                # break
+            if len(terms) < 15: # 格式判断
+                continue
+            thre = float(terms[11].strip()) # 阈值提取
+            if thre < threshold: # 阈值判断
+                continue
+            if int(terms[1].strip()) != sent_id:
+                if sent != '':
+                    deal_one_sent(sent, phrases, triples) # 处理内容
+                sent_id = int(terms[1].strip()) # 提取句子ID
+                sent, phrases, triples = '', list(), list()
+            word_sent, pos_sent, tag_sent = terms[12].strip(), terms[13].strip(), terms[14].strip() # 获取标记内容
+            sent = "%s\t%s\t%s" % (word_sent, pos_sent, tag_sent)
+            if len(triples) == 0:
+                phrases = extract_pos_from_bio(tag_sent.split()) # 提取短语
+            triples.append(([x.strip() for x in terms[5:5 + 6]], thre))
+    if sent != '':
+        deal_one_sent(sent, phrases, triples)
+    writer.close()
+
+
+# 抽取模板程序
+def extract_re_patterns(txt_file, reverb_dir, save_dir, wikidata_infos):
+    print "txt file: ", txt_file
+    print "reverb dir: ", reverb_dir
+    print "save dir: ", save_dir
+
+    mid2name, mid2desp, mid2types, wiki2mid, ent_facts = wikidata_infos # 获取wikidata数据
+
+    label_info_num = 3
+    print "label_info_num: ", label_info_num
+
+    linked_sentences = dict() # 把句子的链接标记信息记录下来
+    with codecs.open(txt_file, 'rb', 'utf-8') as wf:
+        line_num = 0
+        for line in wf:
+            line_num += 1
+            if line_num % (1000 * 1000) == 0:
+                print "deal with: ", line_num
+            terms = line.strip().split("\t")
+            ent_num = (len(terms) - 1) / label_info_num
+            ent_ind_set = set([int(x) for x in terms[1:1 + ent_num]])
+            ent_inds = list() # 实体开始、结束位置索引
+            ent_titles = terms[1 + ent_num: 1 + ent_num * 2] # 实体对应wiki中的title
+            words = [] # 这是词序列
+            for wid, word in enumerate(terms[0].split(' ')):
+                if wid in ent_ind_set:
+                    curr_words = word.split('_')
+                    ent_inds.append((len(words), len(words) + len(curr_words)))
+                    words.extend(curr_words)
+                else:
+                    words.append(word)
+            linked_sentences[' '.join(words)] = (ent_inds, ent_titles)
+    print "linked sent num: ", len(linked_sentences)
+
+    print "start to extract pattern..."
+    reader_reverb = codecs.open(os.path.join(reverb_dir, 'wiki_sent.reverb_np_triples'), 'rb', 'utf-8')
+
+    writer_mapped = codecs.open(os.path.join(save_dir, 'wiki_patterns_mapped'), 'wb', 'utf-8')
+    writer_linked = codecs.open(os.path.join(save_dir, 'wiki_patterns_linked'), 'wb', 'utf-8')
+
+    total_linked_num, reverb_map_num, reverb_linked_num = 0, 0, 0
+    for sent_line in reader_reverb:
+        reader_reverb.readline()
+        reader_reverb.readline()
+        triple_line = reader_reverb.readline()
+        triple_strs = [x.split() for x in triple_line.split('\t')]
+        triples = [([int(x) for x in tri[:6]], float(tri[6]), tri[7:]) for tri in triple_strs]
+        sent = sent_line.split('\t')[0].strip()
+        if sent not in linked_sentences: # reverb抽取的句子是否在链接文本中？
+            continue
+        total_linked_num += 1
+        if total_linked_num % (1000 * 1000) == 0:
+            print "deal with in extract: ", total_linked_num
+        ent_inds, ent_titles = linked_sentences[sent] # 提取实体链接情况
+        for triple, thre, patt_words in triples:
+            sub_h, sub_t, rel_h, rel_t, obj_h, obj_t = triple
+            sub_ind = (sub_h, sub_t)
+            obj_ind = (obj_h, obj_t)
+            if sub_ind not in ent_inds:
+                continue
+            if obj_ind not in ent_inds:
+                continue
+            sub_ent_ind = ent_inds.index(sub_ind)
+            obj_ent_ind = ent_inds.index(obj_ind)
+            title_one = ent_titles[sub_ent_ind]
+            title_two = ent_titles[obj_ent_ind]
+            if title_one not in wiki2mid:
+                continue
+            if title_two not in wiki2mid:
+                continue
+            ent_one = wiki2mid[title_one]
+            ent_two = wiki2mid[title_two]
+            reverb_map_num += 1
+
+            sub_types = mid2types.get(ent_one, list())
+            obj_types = mid2types.get(ent_two, list())
+
+            # pattern = [x.strip() for x in sent_words[rel_h:rel_t]]
+            pattern = ' '.join([x.strip() for x in patt_words])
+
+            ind_str = '\t'.join([str(x) for x in triple]) # 头实体，关系，尾实体的索引
+
+            basic_line = "%s\t%s\t%s" % (sent, pattern, ind_str)
+            basic_line += "\t%s\t%s" % (ent_one, ent_two)
+            basic_line += "\t%s\t%s" % (' '.join(sub_types), ' '.join(obj_types))
+
+            writer_mapped.write("%s\n" % basic_line)
+
+            rels = set()
+            rels.update(ent_facts.get((ent_one, ent_two), set())) # 是否有对应关系
+            rev_rels = ent_facts.get((ent_two, ent_one), set()) # 获取逆对应关系
+            rels.update(set(["%s-R" % x for x in rev_rels]))
+
+            if len(rels) > 0:
+                reverb_linked_num += 1
+                writer_linked.write("%s\t%s\n" % (basic_line, ' '.join(rels)))
+
+    print "total linked num : ", total_linked_num
+    print "reverb mapped num : ", reverb_map_num
+    print "reverb linked num : ", reverb_linked_num
+    reader_reverb.close()
+    writer_mapped.close()
+    writer_linked.close()
+
+
+def pattern_stat(pattern_dir, mid2name):
+    # 'Hanna_Rydh	born in	Stockholm
+    # 0 2	5 6	Q517947	Q1754	P937
+    # Hanna Rydh was born in Stockholm to director Johan Albert Rydh and Matilda Josefina Westlund .'
+    pattern_frqs = dict()
+    rel_pattern_frqs = dict()
+
+    with codecs.open(os.path.join(pattern_dir, 'wiki_patterns_linked'), 'rb', 'utf-8') as rf:
+        line_num = 0
+        for line in rf:
+            terms = line.split('\t')
+            line_num += 1
+            if (line_num % (100 * 1000)) == 0:
+                print "deal with: ", line_num
+            if len(terms) != 4:
+                continue
+            pattern = terms[0].strip()
+            pattern_frqs[pattern] = pattern_frqs.get(pattern, 0) + 1
+            rels = terms[3].strip().split()
+            for curr_rel in rels:
+                tmp_patt_frqs = rel_pattern_frqs.get(curr_rel, dict())
+                tmp_patt_frqs[pattern] = tmp_patt_frqs.get(pattern, 0) + 1
+                rel_pattern_frqs[curr_rel] = tmp_patt_frqs
+
+    writer = codecs.open(os.path.join(pattern_dir, 'rel_pattern_reverb'), 'wb', 'utf-8')
+    rel_list = sorted(list(rel_pattern_frqs.keys()))
+    for rel in rel_list:
+        if rel.endswith('-R'):
+            continue
+        rel_name = mid2name.get(rel, rel)
+        curr_patt_frqs = rel_pattern_frqs[rel]
+        patt_num, patt_sum = len(curr_patt_frqs), sum(curr_patt_frqs.values())
+        # print "%s\t%s\t%d\t%d" % (rel, rel_name, patt_num, patt_sum)
+        writer.write("%s\t%s\t%d\t%d\n" % (rel, rel_name, patt_num, patt_sum))
+        curr_patt_frqs = sorted(curr_patt_frqs.items(), key=lambda x:x[1], reverse=True)
+        for patt, frq in curr_patt_frqs:
+            frq_sum = pattern_frqs[patt]
+            # print "\t%s\t%d\t%d" % (patt, frq, frq_sum)
+            writer.write("\t%s\t%d\t%d\n" % (patt, frq, frq_sum))
+        rev_rel = "%s-R" % rel
+        if rev_rel not in rel_pattern_frqs:
+            continue
+        rel = rev_rel
+        rel_name = mid2name.get(rel, rel)
+        curr_patt_frqs = rel_pattern_frqs[rel]
+        patt_num, patt_sum = len(curr_patt_frqs), sum(curr_patt_frqs.values())
+        # print "%s\t%s\t%d\t%d" % (rel, rel_name, patt_num, patt_sum)
+        writer.write("%s\t%s\t%d\t%d\n" % (rel, rel_name, patt_num, patt_sum))
+        curr_patt_frqs = sorted(curr_patt_frqs.items(), key=lambda x: x[1], reverse=True)
+        for patt, frq in curr_patt_frqs:
+            frq_sum = pattern_frqs[patt]
+            # print "\t%s\t%d\t%d" % (patt, frq, frq_sum)
+            writer.write("\t%s\t%d\t%d\n" % (patt, frq, frq_sum))
+
+    writer.close()
+
+if __name__ == '__main__':
+    # 利用Open IE的结果进行模板的抽取
+    reverb_dir = 'wikipedia'  # reverb数据存在目录
+    filter_reverb_triple(reverb_dir)
+
+    # 首先把实体以及实体间的关系提取出来
+    kb_dir = 'wikidata' # wikidata数据存放目录
+    wikidata_infos = extract_wikidata_info(kb_dir, True)
+
+    # 句子中的短语实体的链接是使用Wikifier标注出来的
+    txt_file = 'wikipedia/labeled_wiki_sentences' # wikifier结果
+
+    save_dir = 'patterns/reverb_patterns' # 模板数据存放目录
+    extract_re_patterns(txt_file, reverb_dir, save_dir, wikidata_infos)
+
+    # 利用提取出来的连接数据进行关系模板的整理
+    patt_dir = "/data/hesz/datasets/wiki_patterns/reverb_patterns"
+    mid2name = wikidata_infos[0]
+    pattern_stat(patt_dir, mid2name)
+
+    pass
